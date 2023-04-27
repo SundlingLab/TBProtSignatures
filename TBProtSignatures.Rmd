@@ -1,0 +1,367 @@
+---
+title: "A comprehensive review of proteomics signature discovery for Tuberculosis"
+author: "Zaynab Mousavian"
+output: html_document
+date: "2023-05-01"
+---
+
+### Loading R packages
+
+```{r}
+library(readxl)
+library(ggplot2)
+library(RColorBrewer)
+library(patchwork)
+```
+
+### The function for searching uniprot IDs in the Uniprot databse
+
+```{r}
+uniprotSearch <- function(proteinName){
+  proteinName <- gsub("-","",proteinName)
+  line <- which(toupper(trimws(proteinName))==uniprot_db$`Entry Name`)
+  if (length(line)==0) line <- grep(paste0("\\b",trimws(proteinName),"\\b"), uniprot_db$`Gene Names`,ignore.case = TRUE)
+  uniprotID <- uniprot_db[line,"Entry"]
+  if (length(line)==0) uniprotID="NULL"
+  return(uniprotID)
+}
+```
+
+### Mapping published signatures to uniprot IDs (No need to run)
+
+```{r}
+convertFunction <- function(inputString) {
+  inputValues <- strsplit(inputString, ",")[[1]]
+  outputValues <- lapply(inputValues, function(y) uniprotSearch(y))
+  outputString <- paste(unlist(outputValues),collapse = ",")
+  return(outputString)
+}
+uniprot_db <- read_excel("../uniprot-human-DB.xlsx")
+uniprot_db$`Entry Name` <- unlist(lapply(uniprot_db$`Entry Name`, function(x) strsplit(x,"_")[[1]][1]))
+file <- read.delim("../Final version of summary file.csv",sep=";")
+names(file)=file[1,]
+file=file[-1,]
+signatures_list <- file$`Signature (only proteins)`
+Uniprot_list <- unlist(lapply(signatures_list,function(y) convertFunction(y)))
+split_list1 <- strsplit(signatures_list, ",")
+split_list2 <- strsplit(Uniprot_list, ",")
+
+# Merge the corresponding elements of list1 and list2 into one list
+merged_list <- mapply(paste, split_list1, split_list2)
+
+max_length <- max(sapply(merged_list, length))
+
+# Pad the shorter lists with NAs to make them the same length as the longest list
+for (i in seq_along(merged_list)) {
+  if (length(merged_list[[i]]) < max_length) {
+    merged_list[[i]] <- c(merged_list[[i]], rep(NA, max_length - length(merged_list[[i]])))
+  }
+}
+
+merged_df <- as.data.frame(do.call(rbind, merged_list))
+merged_df <- cbind(paste(file$Study,file$Year,sep=","),merged_df)
+write.csv(merged_df,file="Converted_signatures.csv")
+```
+
+### Mapping protein annotation from the Human Protein Atlas database to uniprot IDs (No need to run)
+
+```{r}
+proteinAnnotation = read.delim("ProteinMapping.txt",sep=" ")
+row.names(proteinAnnotation) = proteinAnnotation$display_name
+
+list1=lapply(proteinAnnotation$display_name,function(x) uniprotSearch(x))
+proteinAnnotation$UniprotID <- list1
+proteinAnnotation$UniprotID <- lapply(proteinAnnotation$UniprotID,function(x) as.character(x))
+proteinAnnotationData <- apply(proteinAnnotation,2,as.character)
+write.csv(proteinAnnotationData,file="proteinMappingWithUniprotID.csv",quote=FALSE)
+```
+
+### Mapping KEGG signaling pathways from the MSigDB database to uniprot IDs (No need to run)
+
+```{r}
+KEGG <- read.csv("c2.cp.kegg.v2023.1.Hs.symbols.csv",header = FALSE,sep=";")
+
+uniprotSearch <- function(proteinName){
+  proteinName <- gsub("-","",proteinName)
+  line <- which(toupper(trimws(proteinName))==uniprot_db$`Entry Name`)
+  if (length(line)==0) line <- grep(paste0("\\b",trimws(proteinName),"\\b"), uniprot_db$`Gene Names`,ignore.case = TRUE)
+  uniprotID <- uniprot_db[line,"Entry"]
+  if (length(line)==0) uniprotID="NULL"
+  return(uniprotID)
+}
+
+KEGG_converted = matrix(NA, nrow = nrow(KEGG), ncol = ncol(KEGG)-2)
+for (i in 1:nrow(KEGG_converted))
+  for (j in 1:ncol(KEGG_converted))
+    if (KEGG[i,j+2]!="")
+       KEGG_converted[i,j] <- as.character(uniprotSearch(KEGG[i,j+2]))
+    
+save(KEGG_converted,file="KEGG_converted.RData")
+```
+
+### Extracting uniprot IDs for all published signatures
+
+```{r}
+# remove HUMAN_ from uniprot Entry name
+uniprot_db <- read_excel("../uniprot-human-DB.xlsx")
+uniprot_db$`Entry Name` <- unlist(lapply(uniprot_db$`Entry Name`, function(x) strsplit(x,"_")[[1]][1]))
+
+# read signatures from all publications (86 studies) which have been already converted to Uniprot IDs 
+file <- read.csv("Converted_signatures_final.csv",sep=";")
+file <- file[,-c(1,2)]
+file <- data.frame(lapply(file, as.character), stringsAsFactors = FALSE)
+
+# read the information of all publications
+publications <- read.delim("../Final version of summary file.csv",sep=";")
+names(publications)=publications[1,]
+publications=publications[-1,]
+
+# extract uniprot IDs from all publications (183 unique uniprotIds which two values are "NULL" and NA -> 181 uniprotIds)
+my_fun <- function(x) {
+    sapply(strsplit(trimws(x), "\\s+"), "[", 2)
+}
+uniprot_signatures <- data.frame(apply(file, 2, my_fun))
+sort(table(unlist(uniprot_signatures)))
+```
+
+### Visualize number of publications over years (Figure 1:A)
+
+```{r}
+Num_df <- publications[,"Year",drop=FALSE]
+Num_df$Value=1
+Num_df <- aggregate(Value~Year,data=Num_df,FUN = sum)
+Num_df <- Num_df[-which(Num_df$Year==2023),]
+
+publications_plot <- ggplot(Num_df,aes(x=Year,y=Value))+
+  geom_bar(stat="identity",width=0.5,position=position_dodge(0))+
+  theme_bw()+
+  theme(axis.title = element_text(size=7),axis.text = element_text(size=5))+
+  labs(x="Year",y="Number of publications")
+  
+
+pdf(file="Figures/Publications-Year.pdf",width=3,height = 2)
+publications_plot
+dev.off()
+  
+```
+
+### Finding association between proteins and KEGG signaling pathways
+
+```{r}
+# read all KEGG pathways (186 pathways)
+KEGG <- read.csv("c2.cp.kegg.v2023.1.Hs.symbols.csv",header = FALSE,sep=";")
+# read all KEGG pathways which have been already converted to uniprotIds (186 pathways)
+load("KEGG_converted.RData")
+KEGG_converted <- cbind(KEGG$V1,KEGG_converted)
+
+# finding association between signatures and KEGG pathways by using uniprotIds (97 uniprotIds (all have entry name) are associated with at least one pathway)
+KEGG_results=data.frame()
+for (i in 1:nrow(uniprot_signatures))
+  for (j in 1:ncol(uniprot_signatures))
+    if (!is.na(uniprot_signatures[i,j])&!is.null(uniprot_signatures[i,j])&uniprot_signatures[i,j]!="NULL")
+    {
+      uniprotID=uniprot_signatures[i,j]
+      lines <- apply(KEGG_converted,1, function(x) length(grep(uniprotID,x))>0)
+      if (length(which(lines))!=0)
+      {
+        temp=data.frame(Pathway=KEGG_converted[lines,1],ProteinID=uniprotID)
+        KEGG_results <<- rbind(temp,KEGG_results)
+      }
+    }
+
+KEGG_results = KEGG_results[!duplicated(KEGG_results), ]
+KEGG_results = KEGG_results[order(KEGG_results$Pathway),]
+# sort(table(KEGG_results$Pathway))
+
+KEGG_results$Pathway=gsub("KEGG_","",KEGG_results$Pathway)
+KEGG_results$Pathway=gsub("_PATHWAY","",KEGG_results$Pathway)
+KEGG_results$Gene <- unlist(lapply(KEGG_results$ProteinID, function(x) uniprot_db[match(x, uniprot_db$Entry),"Entry Name"]))
+write.csv(KEGG_results,file="KEGG_results.csv",quote=FALSE)
+
+# convert uniprotIds to Uniprot Entry name for all signatures (178 unique Uniprot Entry name which one value is NA -> 177 Entry names)
+gene_signatures <- apply(uniprot_signatures, 2, function(x) uniprot_db[match(x, uniprot_db$Entry),"Entry Name"])
+gene_signatures <- as.data.frame(gene_signatures)
+number_publications <- as.data.frame(table(unlist(gene_signatures)))
+row.names(number_publications) <- number_publications$Var1
+```
+
+### Calculate frequencies for visualization
+
+```{r}
+# calculate the lenght of each pathway name and each protein name
+pathway_name_size <- unlist(lapply(names(sort(table(KEGG_results$Pathway))),function(x) nchar(x)))
+gene_name_size <- unlist(lapply(names(sort(table(KEGG_results$Gene))),function(x) nchar(x)))
+
+# calculate the frequency of each protein name in publications
+selected_genes <- number_publications[unique(KEGG_results$Gene),]
+selected_genes <- selected_genes[order(selected_genes$Freq),]
+selected_genes$Var1 <- as.character(selected_genes$Var1)
+
+# calculate the frequency of each pathway in publications
+selected_pathways <- data.frame(sort(table(KEGG_results$Pathway)))
+selected_pathways$Var1 <- as.character(selected_pathways$Var1)
+
+# merge all details into one info table
+info=data.frame(rbind(cbind(Name=selected_pathways$Var1,Connection=selected_pathways$Freq,Type="Pathway",Size=pathway_name_size),cbind(Name=selected_genes$Var1,Connection=selected_genes$Freq,Type="Gene",Size=gene_name_size)))
+info$Connection=as.integer(info$Connection)
+info$Size=as.integer(info$Size)
+info=info[order(info$Type,info$Connection,info$Size),]
+
+# extract details of pathways and proteins into two tables
+pathway_info=info[info$Type=="Pathway",]
+gene_info=info[info$Type=="Gene",]
+pathway_order=rev(pathway_info$Name)
+gene_order=rev(gene_info$Name)
+
+# extract pathways which have connection with at least 5 proteins (80 proteins)
+pathway_info <- pathway_info[which(pathway_info$Connection>4),]
+pathway_order=rev(pathway_info$Name)
+KEGG_results <-  KEGG_results[which(KEGG_results$Pathway%in%pathway_order),]
+gene_info <-  gene_info[which(gene_info$Name%in%KEGG_results$Gene),]
+gene_order=rev(gene_info$Name)
+
+# extract remaining proteins (97 proteins)
+remainingProteins = number_publications[which(!number_publications$Var1%in%gene_order),"Var1"]
+
+# extract uniprotIds for all proteins which have name (177 proteins)
+number_publications$UniprotID <- unlist(lapply(number_publications$Var1,function(x) uniprotSearch(x)))
+```
+
+### Defining color palette for protein annotation
+
+```{r}
+# read proteins annotation
+proteinAnnotation = read.csv("proteinMappingWithUniprotID.csv")
+
+number_publications$Annotation <- proteinAnnotation[match(number_publications$UniprotID,proteinAnnotation$UniprotID),"function_name"]
+number_publications$Annotation <- gsub("NULL","Other",number_publications$Annotation)
+number_publications$Annotation <- gsub("No annotated function","Other",number_publications$Annotation)
+number_publications[which(is.na(number_publications$Annotation)),"Annotation"]="Other"
+number_publications$Annotation <- factor(number_publications$Annotation,levels=c(setdiff(names(sort(table(number_publications$Annotation),decreasing = TRUE)),"Other"),"Other"))
+library(RColorBrewer)
+numColors <- length(unique(number_publications$Annotation)) # How many colors you need
+myPalette <- c(brewer.pal(n = 8, name = "Dark2"),brewer.pal(n = 8, name = "Set1"),"darkred","darkblue","grey")
+names(myPalette) <- levels(number_publications$Annotation)
+myPalette["Interferon"]="turquoise"
+myPalette["Hormone"]="skyblue"
+myPalette["Apolipoprotein"]="#808000"
+myPalette["Acute phase"]="#E41A1C"
+myPalette["Enzyme inhibitor"]="black"
+```
+
+### Visualize legend for protein annotation
+
+```{r}
+# generate legend for proteins annotation
+Total_annotation = number_publications$Annotation
+pdf(file="Figures/guide_annotation.pdf",width=4,height =7)
+ggplot(number_publications,aes(x=Var1,y=Freq,fill=Annotation))+
+  geom_col()+
+  scale_fill_manual(values=myPalette[Total_annotation])+
+  guides(fill=guide_legend(ncol=2,byrow=TRUE))+
+  labs(fill="",y="",x="")
+dev.off()
+```
+
+### Visualize remaining proteins without association with pathways (Figure 1-D)
+
+```{r}
+# generate barplot for remaining proteins without connection with pathways (97 proteins)
+remaining_genes <- number_publications[remainingProteins,]
+remaining_genes <- remaining_genes[order(remaining_genes$Freq),]
+remaining_genes$Var1 <- as.character(remaining_genes$Var1)
+remaining_gene_info = data.frame(Name=remaining_genes$Var1,Connection=remaining_genes$Freq,Type="Gene")
+remaining_gene_order=rev(remaining_gene_info$Name)
+remaining_gene_annotation=number_publications[remaining_gene_order,"Annotation"]
+remaining_gene_info$annotation <- number_publications[remaining_gene_info$Name,"Annotation"]
+
+remaining_gene_plot <- ggplot(remaining_gene_info,aes(x=factor(Name,level=remaining_gene_order),y=Connection,fill=annotation))+
+  geom_col()+
+  theme_bw()+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=10,face=1,colour=myPalette[remaining_gene_annotation]),axis.text.y=element_text(size=9),axis.ticks.x = element_blank(),legend.position = "none")+
+  labs(y="",x="",fill="")+
+  scale_y_continuous(breaks=c(0,5,10,15,20),expand=c(0,0))+
+  scale_fill_manual(values=myPalette[remaining_gene_annotation])
+  
+```
+
+### Visualize proteins with association with pathways (Figure 1-C)
+
+```{r}
+# generate all plots for proteins which have connection with the most frequent pathways (80 proteins)
+Gene_annotation=number_publications[gene_order,"Annotation"]
+gene_info$annotation <- number_publications[gene_info$Name,"Annotation"]
+
+dotplot<-ggplot(KEGG_results,aes(x=factor(Gene,level=gene_order),y=factor(Pathway,level=pathway_order)))+
+  geom_point(size=3)+
+  theme_bw()+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=10,face=1,colour=myPalette[Gene_annotation]),axis.text.y=element_text(size=10),plot.margin=unit(c(0,0,0,0),"cm"))+
+  labs(x="",y="")
+
+
+pathway_barplot<-ggplot(pathway_info,aes(y=factor(Name,level=pathway_order),x=Connection))+
+  geom_col()+
+  theme_bw()+
+  theme(axis.text.y=element_blank(),axis.text.x=element_text(size=10), axis.ticks.y = element_blank(), plot.margin=unit(c(0,0,-3,0),"cm"))+
+  labs(x="",y="")+
+  scale_x_continuous(breaks=c(0,10,20,30,40),expand=c(0,0))
+
+gene_barplot<-ggplot(gene_info,aes(x=factor(Name,level=gene_order),y=Connection,fill=annotation))+
+  geom_col()+
+  theme_bw()+
+  theme(axis.text.x=element_blank(),axis.text.y=element_text(size=10),axis.ticks.x = element_blank(),plot.margin=unit(c(0,-3,0,0),"cm"),legend.position = "none")+
+  labs(y="",x="")+
+  scale_y_continuous(breaks=c(0,5,10,15,20),expand=c(0,0))+
+  scale_fill_manual(values=myPalette[Gene_annotation])
+
+pdf("Figures/merged-plots.pdf",height = 7,width=20)
+# gene_barplot+ggplot()+theme_void()+dotplot+pathway_barplot+plot_layout(widths = c(1,0.2),heights = c(0.2,1))
+gene_barplot+ggplot()+theme_void()+dotplot+pathway_barplot+remaining_gene_plot+ggplot()+theme_void()+plot_layout(widths = c(1,0.055),heights = c(0.2,1,0.2))
+dev.off()
+```
+
+### Calculate frequencies for showing in donut plots (Figure 1-B)
+
+```{r}
+file <- read.delim("../Final version of summary file.csv",sep=";")
+names(file)=file[1,]
+file=file[-1,]
+
+statistics_data <- data.frame()
+statistics_data <- rbind(statistics_data,cbind(Name="Blood/PBMC",Size=length(which(file$`Blood/PBMC`=="TRUE"))))
+statistics_data <- rbind(statistics_data,cbind(Name="Serum/Plasma",Size=length(which(file$`Serum/Plasma`=="TRUE"))))
+statistics_data <- rbind(statistics_data,cbind(Name="Sputum/Saliva",Size=length(which(file$`Sputum/Saliva`=="TRUE"))))
+statistics_data <- rbind(statistics_data,cbind(Name="Urine",Size=length(which(file$Urine=="TRUE"))))
+statistics_data <- rbind(statistics_data,cbind(Name="Other",Size=length(which(file$Other=="TRUE"))))
+statistics_data$Type <- "SampleType"
+
+temp=as.data.frame(table(file$Technology))
+names(temp)=c("Name","Size")
+temp$Type <- "Technology"
+
+file$NewTechnology <- file$Technology
+file$NewTechnology <- gsub(temp[which(temp$Size==1),"Name"][1], "Other",file$NewTechnology)
+file$NewTechnology <- gsub(temp[which(temp$Size==1),"Name"][2], "Other",file$NewTechnology)
+file$NewTechnology <- gsub(temp[which(temp$Size==1),"Name"][3], "Other",file$NewTechnology)
+file$NewTechnology <- gsub(temp[which(temp$Size==1),"Name"][4], "Other",file$NewTechnology)
+
+table_info <- file[,c("Study","Year","Journal","Blood/PBMC","Serum/Plasma","Sputum/Saliva","Urine","Other","Technology","NewTechnology","Multi-omics")]
+table_info <- table_info[order(table_info$`Blood/PBMC`,table_info$`Serum/Plasma`,table_info$`Sputum/Saliva`,table_info$Urine,table_info$Other,table_info$NewTechnology,table_info$`Multi-omics`,table_info$Year,decreasing = TRUE),]
+write.csv(table_info,file="Table-info.csv",quote = FALSE)
+
+temp=as.data.frame(table(file$NewTechnology))
+names(temp)=c("Name","Size")
+temp$Type <- "Technology"
+statistics_data <- rbind(statistics_data,temp)
+
+temp=as.data.frame(table(file$`Multi-omics`))
+names(temp)=c("Name","Size")
+temp$Type <- "Multi-Omics"
+temp$Name <- gsub(FALSE,"Proteomics",temp$Name)
+temp$Name <- gsub(TRUE,"Multiomics",temp$Name)
+statistics_data <- rbind(statistics_data,temp)
+
+statistics_data$Size=as.numeric(statistics_data$Size)
+write.csv(statistics_data,file="DonutPlots.csv",quote=FALSE)
+```
+
