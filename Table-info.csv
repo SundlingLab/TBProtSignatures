@@ -1,0 +1,87 @@
+,Study,Year,Journal,Blood/PBMC,Serum/Plasma,Sputum/Saliva,Urine,Other,Technology,NewTechnology,Multi-omics
+21,Moreira,2021,EclinicalMedicine,TRUE,TRUE,FALSE,FALSE,FALSE,Other,Other,FALSE
+22,Shang,2021,Experimental and therapeutic medicine,TRUE,FALSE,FALSE,FALSE,TRUE,ELISA,ELISA,FALSE
+37,Min,2020,BMC pulmonary medicine,TRUE,FALSE,FALSE,FALSE,FALSE,Other,Other,FALSE
+9,Kang,2022,Microorganisms,TRUE,FALSE,FALSE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,FALSE
+11,Mann,2022,Cytokine,TRUE,FALSE,FALSE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,FALSE
+67,Esterhuyse,2015,mBio,TRUE,FALSE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,TRUE
+2,Zhou,2023,International immunopharmacology,TRUE,FALSE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+76,Cai,2014,Plos one,TRUE,FALSE,FALSE,FALSE,FALSE,ELISA,ELISA,TRUE
+15,Yao,2022,BMC infectious diseases,TRUE,FALSE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+16,Garlant,2022,Frontiers in immunology,TRUE,FALSE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+62,Shekhawat,2016, Journal of infection and public health,TRUE,FALSE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+63,Kong,2016,American journal of translational research,TRUE,FALSE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+34,Estévez,2020,Plos one,FALSE,TRUE,TRUE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,FALSE
+87,Ribeiro-Rodrigues ,2002,Clinical and diagnostic laboratory immunology,FALSE,TRUE,TRUE,FALSE,FALSE,ELISA,ELISA,FALSE
+39,Penn-nicholson,2019,Plos medicine,FALSE,TRUE,FALSE,FALSE,FALSE,SOMAscan,SOMAscan,FALSE
+51,De Groote,2017,Journal of clinical microbiology,FALSE,TRUE,FALSE,FALSE,FALSE,SOMAscan,SOMAscan,FALSE
+3,Pierneef,2023,iScience,FALSE,TRUE,FALSE,FALSE,FALSE,Lateral flow assay,Other,FALSE
+5,Mousavian,2022,iScience,FALSE,TRUE,FALSE,FALSE,FALSE,Proximity extension assay,Other,FALSE
+33,Li,2020,international journal of clinical chemistry,FALSE,TRUE,FALSE,FALSE,FALSE,Microparticle immunoassay,Other,FALSE
+25,Pedersen,2021,Clinical & translational immunology,FALSE,TRUE,FALSE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,TRUE
+4,Sampath,2023,Scientific reports,FALSE,TRUE,FALSE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,FALSE
+6,Namuganga,2022,Immunology letters,FALSE,TRUE,FALSE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,FALSE
+7,Ndiaye,2022,Scientific reports,FALSE,TRUE,FALSE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,FALSE
+14,Chen,2022,BMC infectious diseases,FALSE,TRUE,FALSE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,FALSE
+18,Kaushik,2022,Frontiers in immunology,FALSE,TRUE,FALSE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,FALSE
+28,Delemarre,2021,Frontiers in immunology,FALSE,TRUE,FALSE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,FALSE
+29,Morris,2021,Frontiers in immunology,FALSE,TRUE,FALSE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,FALSE
+56,Kamakia,2017,The international journal of tuberculosis and lung disease,FALSE,TRUE,FALSE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,FALSE
+65,Jacobs,2016,Oncotarget,FALSE,TRUE,FALSE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,FALSE
+66,Hasibuan,2015,Microbiology and immunology,FALSE,TRUE,FALSE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,FALSE
+8,Fernandes,2022,International journal of molecular sciences,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,TRUE
+13,Li,2022,ACS omega,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+26,Zhang,2021,Frontiers in microbiology,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+31,Garay-Baquero,2020,JCI insight,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+32,Mateos,2020,Scientific reports,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+44,Liu,2018,Molecular medicine reports,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+46,Sun,2018,Frontiers in microbiology,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+52,Bark,2017,EBioMedicine,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+54,Jiang,2017,Plos One,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+60,Sun,2016,Chinese journal of tuberculosis and respiratory diseases ,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+68,Li,2015,Tuberculosis,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+69,Achkar,2015,EBioMedicine,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+70,Xu,2015,Proteomics,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+71,Song,2015,Annals of laboratory medicine,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+73,Zhang,2014,Diagnostic microbiology and infectious disease,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+77,Liu,2013,BMC infectious diseases,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+83,Zhang,2012,Clinica chimica acta,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+84,Sandhu ,2012,Plos one,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+85,Liu,2010,Lung,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+86,Agranoff,2006,Lancet,FALSE,TRUE,FALSE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+30,Blauenfeldt,2020, Journal of clinical microbiology,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,TRUE
+36,Sokołowska,2020,Immunobiology,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,TRUE
+55,Almani,2017,Journal of research in medical sciences,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,TRUE
+12,Essone,2022,Infection,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+17,Lou,2022,Infection and drug resistance,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+19,Ali,2021,Tuberculosis,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+24,Suárez,2021,Infection,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+35,Lubbers,2020,Molecular immunology,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+38,Vinhaes,2019,Cytokine,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+42,Oliveira-de-Souza,2019,Scientific reports,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+47,Lubbers,2018,Frontiers in immunology,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+49,Feng,2018,Scientific reports,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+50,Kashyap,2018,Indian journal of clinical biochemistry,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+53,Kim,2017,Tuberculosis and respiratory diseases,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+57,Goyal,2017,Biomarkers,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+59,Takenami,2016,Tuberculosis,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+72,Lee,2015,The international journal of tuberculosis and lung disease,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+74,Enomoto,2014,Tuberculosis,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+75,Shekhawat,2014,Human immunology,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+78,Magryś,2013,Immunological investigations,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+79,Feruglio,2013,Plos one,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+80,Shu,2013,BMC infectious diseases,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+82,Hong,2012,International journal of infectious diseases,FALSE,TRUE,FALSE,FALSE,FALSE,ELISA,ELISA,FALSE
+58,Lai,2016,Journal of microbiology,FALSE,FALSE,TRUE,FALSE,FALSE,Western blotting,Other,TRUE
+64,Jacobs,2016,Cytokine,FALSE,FALSE,TRUE,FALSE,FALSE,Multiplex bead assay,Multiplex bead assay,FALSE
+27,HaileMariam,2021, Frontiers in cellular and infection microbiology,FALSE,FALSE,TRUE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,TRUE
+20,Mutavhatsindi,2021,Tuberculosis,FALSE,FALSE,TRUE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+40,Mateos,2019,Journal of proteomics,FALSE,FALSE,TRUE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+41,Bishwal,2019,Scientific reports,FALSE,FALSE,TRUE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+81,Fu,2012,Clinical microbiology and infection,FALSE,FALSE,TRUE,FALSE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+45,Wang,2018,Emerging microbes & infections,FALSE,FALSE,FALSE,TRUE,FALSE,Mass spectrometry,Mass spectrometry,TRUE
+10,Kaushik,2022,Biochemical and biophysical research communications,FALSE,FALSE,FALSE,TRUE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+23,Liu,2021,IUBMB life,FALSE,FALSE,FALSE,TRUE,FALSE,Mass spectrometry,Mass spectrometry,FALSE
+61,Adewole,2016,Proteomics. Clinical applications,FALSE,FALSE,FALSE,FALSE,TRUE,Mass spectrometry,Mass spectrometry,FALSE
+48,Santos,2018,Plos one,FALSE,FALSE,FALSE,FALSE,TRUE,ELISA,ELISA,FALSE
+43,Qiu,2019,BMC infectious diseases,FALSE,FALSE,FALSE,FALSE,FALSE,Other,Other,FALSE
