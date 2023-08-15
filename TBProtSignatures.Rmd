@@ -1,0 +1,785 @@
+---
+title: "A comprehensive review of proteomics signature discovery for Tuberculosis"
+author: "Zaynab Mousavian"
+output: html_document
+date: "2023-05-01"
+---
+
+### Loading R packages
+
+```{r}
+library(readxl)
+library(ggplot2)
+library(RColorBrewer)
+library(reshape2)
+library(patchwork)
+library(ggvenn)
+library(enrichR)
+library(tidyr)
+library(cowplot)
+```
+
+### The function for searching uniprot IDs in the Uniprot databse
+
+```{r}
+uniprotSearch <- function(proteinName){
+  proteinName <- gsub("-","",proteinName)
+  line <- which(toupper(trimws(proteinName))==uniprot_db$`Entry Name`)
+  if (length(line)==0) line <- grep(paste0("\\b",trimws(proteinName),"\\b"), uniprot_db$`Gene Names`,ignore.case = TRUE)
+  uniprotID <- uniprot_db[line,"Entry"]
+  if (length(line)==0) uniprotID="NULL"
+  return(uniprotID)
+}
+```
+
+### Mapping published signatures to uniprot IDs (No need to run)
+
+```{r}
+convertFunction <- function(inputString) {
+  inputValues <- strsplit(inputString, ",")[[1]]
+  outputValues <- lapply(inputValues, function(y) uniprotSearch(y))
+  outputString <- paste(unlist(outputValues),collapse = ",")
+  return(outputString)
+}
+uniprot_db <- read_excel("../uniprot-human-DB.xlsx")
+uniprot_db$`Entry Name` <- unlist(lapply(uniprot_db$`Entry Name`, function(x) strsplit(x,"_")[[1]][1]))
+file <- read.delim("../Summary_publications.csv",sep=";")
+names(file)=file[1,]
+file=file[-1,]
+signatures_list <- file$`Signature (only proteins)`
+Uniprot_list <- unlist(lapply(signatures_list,function(y) convertFunction(y)))
+split_list1 <- strsplit(signatures_list, ",")
+split_list2 <- strsplit(Uniprot_list, ",")
+
+# Merge the corresponding elements of list1 and list2 into one list
+merged_list <- mapply(paste, split_list1, split_list2)
+
+max_length <- max(sapply(merged_list, length))
+
+# Pad the shorter lists with NAs to make them the same length as the longest list
+for (i in seq_along(merged_list)) {
+  if (length(merged_list[[i]]) < max_length) {
+    merged_list[[i]] <- c(merged_list[[i]], rep(NA, max_length - length(merged_list[[i]])))
+  }
+}
+
+merged_df <- as.data.frame(do.call(rbind, merged_list))
+merged_df <- cbind(paste(file$Study,file$Year,sep=","),merged_df)
+write.csv(merged_df,file="Converted_signatures.csv")
+```
+
+### Mapping protein annotation from the Human Protein Atlas database to uniprot IDs (No need to run)
+
+```{r}
+proteinAnnotation = read.delim("ProteinMapping.txt",sep=" ")
+row.names(proteinAnnotation) = proteinAnnotation$display_name
+
+list1=lapply(proteinAnnotation$display_name,function(x) uniprotSearch(x))
+proteinAnnotation$UniprotID <- list1
+proteinAnnotation$UniprotID <- lapply(proteinAnnotation$UniprotID,function(x) as.character(x))
+proteinAnnotationData <- apply(proteinAnnotation,2,as.character)
+write.csv(proteinAnnotationData,file="proteinMappingWithUniprotID.csv",quote=FALSE)
+```
+
+### Mapping KEGG signaling pathways from the MSigDB database to uniprot IDs (No need to run)
+
+```{r}
+KEGG <- read.csv("c2.cp.kegg.v2023.1.Hs.symbols.csv",header = FALSE,sep=";")
+
+uniprotSearch <- function(proteinName){
+  proteinName <- gsub("-","",proteinName)
+  line <- which(toupper(trimws(proteinName))==uniprot_db$`Entry Name`)
+  if (length(line)==0) line <- grep(paste0("\\b",trimws(proteinName),"\\b"), uniprot_db$`Gene Names`,ignore.case = TRUE)
+  uniprotID <- uniprot_db[line,"Entry"]
+  if (length(line)==0) uniprotID="NULL"
+  return(uniprotID)
+}
+
+KEGG_converted = matrix(NA, nrow = nrow(KEGG), ncol = ncol(KEGG)-2)
+for (i in 1:nrow(KEGG_converted))
+  for (j in 1:ncol(KEGG_converted))
+    if (KEGG[i,j+2]!="")
+       KEGG_converted[i,j] <- as.character(uniprotSearch(KEGG[i,j+2]))
+    
+save(KEGG_converted,file="KEGG_converted.RData")
+```
+
+### Extracting uniprot IDs for all published signatures
+
+```{r}
+# remove HUMAN_ from uniprot Entry name
+uniprot_db <- read_excel("../uniprot-human-DB.xlsx")
+uniprot_db$`Entry Name` <- unlist(lapply(uniprot_db$`Entry Name`, function(x) strsplit(x,"_")[[1]][1]))
+
+# read signatures from all publications (86 studies) which have been already converted to Uniprot IDs 
+file <- read.csv("Converted_signatures.csv",sep=";")
+file <- file[,-1]
+file <- data.frame(lapply(file, as.character), stringsAsFactors = FALSE)
+
+# read the information of all publications
+publications <- read.delim("Summary_publications.csv",sep=";")
+names(publications)=publications[1,]
+publications=publications[-1,]
+
+# extract uniprot IDs from all publications (183 unique uniprotIds which two values are "NULL" and NA -> 181 uniprotIds)
+my_fun <- function(x) {
+    sapply(strsplit(trimws(x), "\\s+"), "[", 2)
+}
+uniprot_signatures <- data.frame(apply(file, 2, my_fun))
+sort(table(unlist(uniprot_signatures)))
+```
+
+### Visualize number of publications over years (Figure 1:A)
+
+```{r}
+Num_df <- publications[,"Year",drop=FALSE]
+Num_df$Value=1
+Num_df <- aggregate(Value~Year,data=Num_df,FUN = sum)
+Num_df <- Num_df[-which(Num_df$Year==2023),]
+
+publications_plot <- ggplot(Num_df,aes(x=Year,y=Value))+
+  geom_bar(stat="identity",width=0.5,position=position_dodge(0))+
+  theme_bw()+
+  theme(axis.title = element_text(size=7),axis.text.x = element_text(size=5,angle=90,vjust=0.5,hjust=0.5),axis.text.y = element_text(size=5),axis.ticks = element_blank())+
+  labs(x="Year",y="Number of publications")+
+  scale_y_continuous(expand=c(0,0),limits=c(0,15))
+  
+
+pdf(file="New Figures/Publications-Year.pdf",width=3,height = 2)
+publications_plot
+dev.off()
+  
+```
+
+### Finding association between proteins and KEGG signaling pathways
+
+```{r}
+# read all KEGG pathways (186 pathways)
+KEGG <- read.csv("c2.cp.kegg.v2023.1.Hs.symbols.csv",header = FALSE,sep=";")
+# read all KEGG pathways which have been already converted to uniprotIds (186 pathways)
+load("KEGG_converted.RData")
+KEGG_converted <- cbind(KEGG$V1,KEGG_converted)
+
+protein_atlas <- read.csv("proteinatlas.tsv",sep="\t")
+
+# finding association between signatures and KEGG pathways by using uniprotIds (97 uniprotIds (all have entry name) are associated with at least one pathway)
+KEGG_results=data.frame()
+for (i in 1:nrow(uniprot_signatures))
+  for (j in 1:ncol(uniprot_signatures))
+    if (!is.na(uniprot_signatures[i,j])&!is.null(uniprot_signatures[i,j])&uniprot_signatures[i,j]!="NULL")
+    {
+      uniprotID=uniprot_signatures[i,j]
+      lines <- apply(KEGG_converted,1, function(x) length(grep(uniprotID,x))>0)
+      if (length(which(lines))!=0)
+      {
+        temp=data.frame(Pathway=KEGG_converted[lines,1],ProteinID=uniprotID)
+        KEGG_results <<- rbind(temp,KEGG_results)
+      }
+    }
+
+KEGG_results = KEGG_results[!duplicated(KEGG_results), ]
+KEGG_results = KEGG_results[order(KEGG_results$Pathway),]
+# sort(table(KEGG_results$Pathway))
+
+KEGG_results$Pathway=gsub("KEGG_","",KEGG_results$Pathway)
+KEGG_results$Pathway=gsub("_PATHWAY","",KEGG_results$Pathway)
+KEGG_results$Gene <- unlist(lapply(KEGG_results$ProteinID, function(x) uniprot_db[match(x, uniprot_db$Entry),"Entry Name"]))
+
+KEGG_results$NewName <- protein_atlas[match(KEGG_results$ProteinID,protein_atlas$Uniprot),"Gene"]
+KEGG_results[which(is.na(KEGG_results$NewName)),"NewName"] <- KEGG_results[which(is.na(KEGG_results$NewName)),"Gene"]
+
+write.csv(KEGG_results,file="KEGG_results.csv",quote=FALSE)
+
+gene_signatures <- apply(uniprot_signatures, 2, function(x) uniprot_db[match(x, uniprot_db$Entry),"Entry Name"])
+gene_signatures <- as.data.frame(gene_signatures)
+number_publications <- as.data.frame(table(unlist(gene_signatures)))
+row.names(number_publications) <- number_publications$Var1
+```
+
+### Finding proteins without uniprot ids which were excluded from analysis
+
+```{r}
+total=names(table(unlist(uniprot_signatures)))
+total[which(!total%in%uniprot_db$Entry)]
+sum(table(unlist(file))[grep("NULL",names(table(unlist(file))))])
+table(unlist(file))
+temp_file <- table(unlist(file))[grep("NULL",names(table(unlist(file))))]
+temp_file <- as.data.frame(temp_file)
+write.csv(temp_file,file="New Figures/non-mapped_protein.csv",quote=FALSE)
+```
+
+### Calculate frequencies for visualization
+
+```{r}
+number_publications$UniprotID <- unlist(lapply(number_publications$Var1,function(x) uniprotSearch(x)))
+number_publications$NewName <- protein_atlas[match(number_publications$UniprotID,protein_atlas$Uniprot),"Gene"]
+number_publications[which(is.na(number_publications$NewName)),"NewName"] <- as.character(number_publications[which(is.na(number_publications$NewName)),"Var1"])
+row.names(number_publications) <- number_publications$NewName
+
+# calculate the length of each pathway name and each protein name
+pathway_name_size <- unlist(lapply(names(sort(table(KEGG_results$Pathway))),function(x) nchar(x)))
+gene_name_size <- unlist(lapply(names(sort(table(KEGG_results$NewName))),function(x) nchar(x)))
+
+# calculate the frequency of each protein name in publications
+selected_genes <- number_publications[unique(KEGG_results$NewName),]
+selected_genes <- selected_genes[order(selected_genes$Freq),]
+
+# calculate the frequency of each pathway in publications
+selected_pathways <- data.frame(sort(table(KEGG_results$Pathway)))
+selected_pathways$Var1 <- as.character(selected_pathways$Var1)
+
+# merge all details into one info table
+info=data.frame(rbind(cbind(Name=selected_pathways$Var1,Connection=selected_pathways$Freq,Type="Pathway",Size=pathway_name_size),cbind(Name=selected_genes$NewName,Connection=selected_genes$Freq,Type="Gene",Size=gene_name_size)))
+info$Connection=as.integer(info$Connection)
+info$Size=as.integer(info$Size)
+info=info[order(info$Type,info$Connection,info$Size),]
+
+# extract details of pathways and proteins into two tables
+pathway_info=info[info$Type=="Pathway",]
+gene_info=info[info$Type=="Gene",]
+pathway_order=rev(pathway_info$Name)
+gene_order=rev(gene_info$NewName)
+
+# extract pathways which have connection with at least 5 proteins 
+pathway_info <- pathway_info[which(pathway_info$Connection>4),]
+pathway_order=rev(pathway_info$Name)
+KEGG_results <-  KEGG_results[which(KEGG_results$Pathway%in%pathway_order),]
+gene_info <-  gene_info[which(gene_info$Name%in%KEGG_results$NewName),]
+gene_order=rev(gene_info$Name)
+
+# extract remaining proteins 
+remainingProteins = number_publications[which(!number_publications$NewName%in%gene_order),"NewName"]
+```
+
+### Defining color palette for protein annotation
+
+```{r}
+# read proteins annotation
+proteinAnnotation = read.csv("proteinMappingWithUniprotID.csv")
+
+number_publications$Annotation <- proteinAnnotation[match(number_publications$UniprotID,proteinAnnotation$UniprotID),"function_name"]
+number_publications$Annotation <- gsub("NULL","Other",number_publications$Annotation)
+number_publications$Annotation <- gsub("No annotated function","Other",number_publications$Annotation)
+number_publications[which(is.na(number_publications$Annotation)),"Annotation"]="Other"
+number_publications$Annotation <- factor(number_publications$Annotation,levels=c(setdiff(names(sort(table(number_publications$Annotation),decreasing = TRUE)),"Other"),"Other"))
+numColors <- length(unique(number_publications$Annotation)) # How many colors you need
+myPalette <- c(brewer.pal(n = 8, name = "Dark2"),brewer.pal(n = 8, name = "Set1"),"darkred","darkblue","grey")
+names(myPalette) <- levels(number_publications$Annotation)
+myPalette["Interferon"]="turquoise"
+myPalette["Hormone"]="skyblue"
+myPalette["Apolipoprotein"]="#808000"
+myPalette["Acute phase"]="#E41A1C"
+myPalette["Enzyme inhibitor"]="black"
+```
+
+### Visualize legend for protein annotation (Figure 1:C,D,E)
+
+```{r}
+# generate legend for proteins annotation
+Total_annotation = number_publications$Annotation
+pdf(file="New Figures/guide_annotation.pdf",width=4,height =7)
+ggplot(number_publications,aes(x=Var1,y=Freq,fill=Annotation))+
+  geom_col()+
+  scale_fill_manual(values=myPalette[Total_annotation])+
+  guides(fill=guide_legend(ncol=2,byrow=TRUE))+
+  labs(fill="",y="",x="")
+dev.off()
+```
+
+### Visualize remaining proteins without association with pathways (Figure 1:E)
+
+```{r}
+# generate barplot for remaining proteins without connection with pathways (99 proteins)
+remaining_genes <- number_publications[remainingProteins,]
+remaining_genes <- remaining_genes[order(remaining_genes$Freq),]
+remaining_genes$NewName <- as.character(remaining_genes$NewName)
+remaining_gene_info = data.frame(Name=remaining_genes$NewName,Connection=remaining_genes$Freq,Type="Gene")
+remaining_gene_order=rev(remaining_gene_info$Name)
+remaining_gene_annotation=number_publications[remaining_gene_order,"Annotation"]
+remaining_gene_info$annotation <- number_publications[remaining_gene_info$Name,"Annotation"]
+
+remaining_gene_plot <- ggplot(remaining_gene_info,aes(x=factor(Name,level=remaining_gene_order),y=Connection,fill=annotation))+
+  geom_col()+
+  theme_bw()+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=10,face=1,colour=myPalette[remaining_gene_annotation]),axis.text.y=element_text(size=9),axis.ticks.x = element_blank(),legend.position = "none")+
+  labs(y="",x="",fill="")+
+  scale_y_continuous(breaks=c(0,5,10,15,20),expand=c(0,0))+
+  scale_fill_manual(values=myPalette[remaining_gene_annotation])
+  
+```
+
+### Visualize proteins with association with pathways (Figure 1:D)
+
+```{r}
+# generate all plots for proteins which have connection with the most frequent pathways (80 proteins)
+Gene_annotation=number_publications[gene_order,"Annotation"]
+gene_info$annotation <- number_publications[gene_info$Name,"Annotation"]
+
+
+dotplot<-ggplot(KEGG_results,aes(x=factor(NewName,level=gene_order),y=factor(Pathway,level=pathway_order)))+
+  geom_point(size=3)+
+  theme_bw()+
+  theme(axis.text.x=element_text(angle=90,hjust=1,vjust=0.5,size=10,face=1,colour=myPalette[Gene_annotation]),axis.text.y=element_text(size=10),plot.margin=unit(c(0,0,0,0),"cm"))+
+  labs(x="",y="")
+
+
+pathway_barplot<-ggplot(pathway_info,aes(y=factor(Name,level=pathway_order),x=Connection))+
+  geom_col()+
+  theme_bw()+
+  theme(axis.text.y=element_blank(),axis.text.x=element_text(size=10), axis.ticks.y = element_blank(), plot.margin=unit(c(0,0,-3,0),"cm"))+
+  labs(x="",y="")+
+  scale_x_continuous(breaks=c(0,10,20,30,40),expand=c(0,0))
+
+
+gene_barplot<-ggplot(gene_info,aes(x=factor(Name,level=gene_order),y=Connection,fill=annotation))+
+  geom_col()+
+  theme_bw()+
+  theme(axis.text.x=element_blank(),axis.text.y=element_text(size=10),axis.ticks.x = element_blank(),plot.margin=unit(c(0,-3,0,0),"cm"),legend.position = "none")+
+  labs(y="",x="")+
+  scale_y_continuous(breaks=c(0,5,10,15,20),expand=c(0,0))+
+  scale_fill_manual(values=myPalette[Gene_annotation])
+
+pdf("New Figures/merged-plots.pdf",height = 7,width=20)
+gene_barplot+ggplot()+theme_void()+dotplot+pathway_barplot+remaining_gene_plot+ggplot()+theme_void()+plot_layout(widths = c(1,0.055),heights = c(0.2,1,0.2))
+dev.off()
+```
+
+### Calculate frequencies for showing in donut plots (Figure 1:B)
+
+```{r}
+file <- read.delim("Summary_publications.csv",sep=";")
+names(file)=file[1,]
+file=file[-1,]
+
+statistics_data <- data.frame()
+statistics_data <- rbind(statistics_data,cbind(Name="Blood/PBMC",Size=length(which(file$`Blood/PBMC`=="TRUE"))))
+statistics_data <- rbind(statistics_data,cbind(Name="Serum/Plasma",Size=length(which(file$`Serum/Plasma`=="TRUE"))))
+statistics_data <- rbind(statistics_data,cbind(Name="Sputum/Saliva",Size=length(which(file$`Sputum/Saliva`=="TRUE"))))
+statistics_data <- rbind(statistics_data,cbind(Name="Urine",Size=length(which(file$Urine=="TRUE"))))
+statistics_data <- rbind(statistics_data,cbind(Name="Other",Size=length(which(file$Other=="TRUE"))))
+statistics_data$Type <- "SampleType"
+
+temp=as.data.frame(table(file$Technology))
+names(temp)=c("Name","Size")
+temp$Type <- "Technology"
+
+file$NewTechnology <- file$Technology
+file$NewTechnology <- gsub(temp[which(temp$Size==1),"Name"][1], "Other",file$NewTechnology)
+file$NewTechnology <- gsub(temp[which(temp$Size==1),"Name"][2], "Other",file$NewTechnology)
+file$NewTechnology <- gsub(temp[which(temp$Size==1),"Name"][3], "Other",file$NewTechnology)
+
+table_info <- file[,c("Study","Year","Journal","Blood/PBMC","Serum/Plasma","Sputum/Saliva","Urine","Other","Technology","NewTechnology","Multi-omics")]
+write.csv(table_info,file="Table-info.csv",quote = FALSE)
+
+temp=as.data.frame(table(file$NewTechnology))
+names(temp)=c("Name","Size")
+temp$Type <- "Technology"
+statistics_data <- rbind(statistics_data,temp)
+
+temp=as.data.frame(table(file$`Multi-omics`))
+names(temp)=c("Name","Size")
+temp$Type <- "Multi-Omics"
+temp$Name <- gsub(FALSE,"Proteomics",temp$Name)
+temp$Name <- gsub(TRUE,"Multiomics",temp$Name)
+statistics_data <- rbind(statistics_data,temp)
+
+statistics_data$Size=as.numeric(statistics_data$Size)
+write.csv(statistics_data,file="DonutPlots.csv",quote=FALSE)
+```
+
+### Calculate frequencies of proteins in targeted and non-targeted studies (Figure 2:B,D)
+
+```{r}
+file=read.csv("Table-info.csv")
+file$Name = paste0(file$Study,", ",file$Year)
+file$methodCategory="Targeted"
+file[which(file$NewTechnology%in%c("Mass spectrometry","SOMAscan")),"methodCategory"]="Non-Targeted"
+
+discovery_publications = which(file$methodCategory=="Non-Targeted")
+discovery_table=as.data.frame(sort(table(unlist(uniprot_signatures[discovery_publications,]))))
+discovery_proteins = names(sort(table(unlist(uniprot_signatures[discovery_publications,]))))
+discovery_proteins=setdiff(discovery_proteins,"NULL")
+discovery_number = length(discovery_proteins)
+discovery_number
+
+hypothesis_publications = which(file$methodCategory=="Targeted")
+hypothesis_table=as.data.frame(sort(table(unlist(uniprot_signatures[hypothesis_publications,]))))
+hypothesis_proteins = names(sort(table(unlist(uniprot_signatures[hypothesis_publications,]))))
+hypothesis_proteins=setdiff(hypothesis_proteins,"NULL")
+hypothesis_number = length(hypothesis_proteins)
+hypothesis_number
+
+overlapping_proteins = intersect(discovery_proteins,hypothesis_proteins)
+overlapping_number=length(overlapping_proteins)
+discovery_number - overlapping_number
+hypothesis_number - overlapping_number
+
+onlyDiscovery_proteins = setdiff(discovery_proteins,overlapping_proteins)
+onlyHypothesis_proteins = setdiff(hypothesis_proteins,overlapping_proteins)
+
+row.names(number_publications)=number_publications$UniprotID
+sort(table(number_publications[overlapping_proteins,"Annotation"]))
+number_publications[overlapping_proteins,"NewName"]
+sort(table(number_publications[onlyHypothesis_proteins,"Annotation"]))
+
+number_publications$color="black"
+number_publications[which(number_publications$UniprotID%in%overlapping_proteins),"color"]="Overlap"
+number_publications[which(number_publications$UniprotID%in%onlyDiscovery_proteins),"color"]="Non-Targeted"
+number_publications[which(number_publications$UniprotID%in%onlyHypothesis_proteins),"color"]="Targeted"
+levels(number_publications$color)=c("Targeted","Overlap","Non-Targeted")
+
+pdf("New Figures/HypotheisDiscovery.pdf",width=30,height = 10)
+protein_order=number_publications[order(number_publications$Freq,decreasing = FALSE),"NewName"]
+ggplot(number_publications,aes(x=factor(NewName,protein_order),y=Freq,fill=color))+
+  geom_col()+
+  scale_fill_manual(values=c("Overlap"="#fe938b","Non-Targeted"="steelblue","Targeted"="#e7b99d"))+
+  theme(axis.text.x =element_text(angle = 90,hjust=1,vjust=0.5),axis.ticks.x = element_blank())+
+  labs(fill="",x="",y="Number of publications")+
+  scale_y_continuous(expand=c(0,0))
+
+dev.off()
+  
+merged_table = merge(discovery_table,hypothesis_table,all.x = TRUE,all.y=TRUE,by="Var1")
+names(merged_table)=c("UniprotID","Non-Targeted","Targeted")
+merged_table$Symbol = unlist(lapply(as.character(merged_table$UniprotID),function(x) number_publications[x,"Var1"]))
+merged_table=melt(merged_table)
+merged_table[which(is.na(merged_table$value)),"value"]=0
+merged_table=merged_table[-which(merged_table$UniprotID=="NULL"),]
+merged_table=merged_table[-which(is.na(merged_table$Symbol)),]
+merged_table$NewName <- protein_atlas[match(merged_table$UniprotID,protein_atlas$Uniprot),"Gene"]
+merged_table[which(is.na(merged_table$NewName)),"NewName"] <- as.character(merged_table[which(is.na(merged_table$NewName)),"Symbol"])
+
+
+merged_table$variable = factor(merged_table$variable,levels = c("Targeted","Non-Targeted"))
+protein_order=number_publications[order(number_publications$Freq,decreasing = FALSE),"NewName"]
+
+summary_table <- merged_table %>%
+  group_by(NewName) %>%
+  summarize(total_value = sum(value))
+
+selectedNames <- as.vector(summary_table%>%filter(total_value>1)%>%select(NewName))$NewName
+merged_table <- merged_table%>%filter(NewName%in%selectedNames)
+
+pdf("New Figures/HypotheisDiscovery-stacked.pdf",width=15,height = 3)
+ggplot(merged_table,aes(x=factor(NewName,protein_order),y=value,fill=variable))+
+  geom_bar(stat = "identity") + 
+  scale_fill_manual(values=c("Targeted"="#e7b99d","Non-Targeted"="steelblue"))+
+  theme(axis.text.x =element_text(angle = 90,hjust=1,vjust=0.5),axis.ticks.x = element_blank())+
+  labs(fill="",x="",y="Number of publications")+
+  scale_y_continuous(expand=c(0,0))
+dev.off()
+
+a <- list("Targeted"=hypothesis_proteins,"Non-Targeted"=discovery_proteins)
+pdf(file="New Figures/VennDiag.pdf",height=3,width=5)
+ggvenn(a, stroke_linetype = 2, stroke_size = 0.5,
+  set_name_color = "black", set_name_size = 4,text_size = 3,
+  fill_color = c("#e7b99d","steelblue"),fill_alpha = 1)
+dev.off()
+
+protein_atlas <- read.csv("proteinatlas.tsv",sep="\t")
+
+a=protein_atlas[match(overlapping_proteins,protein_atlas$Uniprot),c("Uniprot","Gene","Blood.concentration...Conc..blood.IM..pg.L.")]
+b=protein_atlas[match(onlyDiscovery_proteins,protein_atlas$Uniprot),c("Uniprot","Gene","Blood.concentration...Conc..blood.IM..pg.L.")]
+c=protein_atlas[match(onlyHypothesis_proteins,protein_atlas$Uniprot),c("Uniprot","Gene","Blood.concentration...Conc..blood.IM..pg.L.")]
+
+d=rbind(a,b,c)
+names(d)=c("Uniprot","Gene","Conc")
+d=d[order(d$Conc),]
+d=d[-which(is.na(d$Conc)),]
+d$Conc=log10(d$Conc)
+gene_order=d$Gene
+d$Color=number_publications[match(d$Uniprot,number_publications$UniprotID),"color"]
+d$Color = factor(d$Color,levels=c("Targeted","Overlap","Non-Targeted"))
+colors=c("Targeted"="#e7b99d","Overlap"="#fe938b","Non-Targeted"="steelblue")
+pdf("New Figures/Concentration.pdf",width=12,height = 3)
+ggplot(d,aes(x=factor(Gene,level=gene_order),y=Conc,fill=Color))+
+  geom_col()+
+  theme_bw()+
+  scale_fill_manual(values= colors[d$Color])+
+  theme(axis.text.x = element_text(hjust=1,vjust=0.5,angle = 90,color = colors[d$Color]),axis.ticks.x = element_blank(),legend.text = element_text(size=7),axis.title.y = element_text(size=7),axis.text = element_text(size=7))+
+  labs(x="",y="Log10(Protein Concentration)",fill="")+
+  scale_y_continuous(expand = c(0,0))
+dev.off()
+
+overlapping_proteins = number_publications[number_publications$color=="Overlap","NewName"]
+onlyHypothesis_proteins = number_publications[number_publications$color=="Targeted","NewName"]
+onlyDiscovery_proteins = number_publications[number_publications$color=="Non-Targeted","NewName"]
+write.csv(overlapping_proteins,file="OverlappingProteins.csv")
+```
+
+### Calculate frequencies of proteins in Mass Spectrometry studies (Figure 1:C)
+
+```{r}
+file=read.csv("Table-info.csv")
+file$Name = paste0(file$Study,", ",file$Year)
+
+MS_publications = which(file$NewTechnology=="Mass spectrometry")
+MS_table=as.data.frame(sort(table(unlist(uniprot_signatures[MS_publications,]))))
+MS_proteins = names(sort(table(unlist(uniprot_signatures[MS_publications,]))))
+MS_proteins=setdiff(MS_proteins,"NULL")
+MS_number = length(MS_proteins)
+MS_number
+
+number_publications$MS="none"
+number_publications[which(number_publications$UniprotID%in%MS_proteins),"MS"]="MS"
+
+
+MS_publications_overlap <- number_publications%>%filter(MS=="MS"&Freq>1)
+MS_freq <- merged_table%>%filter(variable=="Non-Targeted")
+MS_publications_overlap$MS_number <- MS_freq[match(MS_publications_overlap$UniprotID,MS_freq$UniprotID),"value"]
+MS_publications_overlap$percent <- MS_freq[match(MS_publications_overlap$UniprotID,MS_freq$UniprotID),"value"]*100/28
+
+MS_publications_overlap <- MS_publications_overlap%>%filter(MS_number>1)
+MS_publications_overlap <- MS_publications_overlap[order(MS_publications_overlap$MS_number),]
+
+gene_order=MS_publications_overlap$NewName
+Gene_annotation=MS_publications_overlap$Annotation
+
+p1 = ggplot(MS_publications_overlap,aes(y=factor(NewName,level=gene_order),x=MS_number,fill=Annotation))+
+  geom_col()+
+  theme_bw()+
+  theme(axis.text.x=element_text(size=5),axis.text.y=element_text(size=5,colour=myPalette[Gene_annotation]),axis.ticks.x = element_blank(),plot.margin=unit(c(0,-3,0,0),"cm"),legend.position = "none")+
+  labs(y="",x="")+
+  scale_x_continuous(breaks=c(0,2,4,6),expand=c(0,0),position = "top")+
+  scale_fill_manual(values=myPalette[Gene_annotation])
+
+p2 = ggplot(MS_publications_overlap,aes(y=factor(NewName,level=gene_order),x=percent,fill=Annotation))+
+  geom_col()+
+  theme_bw()+
+  theme(axis.ticks.x = element_blank(),axis.text.x =element_text(size=5),axis.text.y=element_text(size=5,colour=myPalette[Gene_annotation]),plot.margin=unit(c(0,-3,0,0),"cm"),legend.position = "none",)+
+  labs(y="",x="")+
+  scale_x_continuous(breaks=c(0,5,10,15,20),expand=c(0,0),position = "top")+
+  scale_fill_manual(values=myPalette[Gene_annotation])
+
+pdf("New Figures/MS_overlap.pdf",height = 4,width=3)
+p1+p2
+dev.off()
+```
+
+### Functional enrichment analysis (Figure 2:C)
+
+```{r}
+gene_list = as.vector(onlyHypothesis_proteins)
+col <- "#e7b99d"
+thr <- 0.05
+point_size <- 6
+text_size <-
+dbs <- listEnrichrDbs()
+head(dbs)
+BPs <- c("GO_Biological_Process_2021")
+pathways <- c("KEGG_2021_Human")
+databases <- c("DisGeNET")
+TFs <- c("TRRUST_Transcription_Factors_2019")
+species <- "Homo sapiens"
+
+enriched <- enrichr(gene_list, BPs)
+result <- enriched[[1]]
+result <- result %>% filter(Adjusted.P.value<thr)
+
+result$val <- -log10(result$Adjusted.P.value)
+result <- result[1:12,]
+result$Term <- unlist(lapply(result$Term, function(x) sub("\\s*\\(.*", "", x)))
+result$num <- unlist(lapply(result$Overlap, function(x) unlist(strsplit(x, "/"))[1]))
+
+result <- result %>%
+  arrange(val) %>%    # First sort by val. This sort the dataframe but NOT the factor levels
+  mutate(Term=factor(Term, levels=Term))   # This trick update the factor levels
+p1 = ggplot(result, aes(x=Term, y=val))+
+    geom_segment( aes(xend=Term, yend=0)) +
+    geom_point(size=point_size, color=col) +
+    geom_text(aes(label = num), size=3, vjust = 0,hjust= 0.5) +
+    coord_flip() +
+    theme_bw() +
+    ylab("-log10(FDR pValue)")+
+    xlab("GO biological process")
+
+enriched <- enrichr(gene_list, pathways)
+result <- enriched[[1]]
+result <- result %>% filter(Adjusted.P.value<thr)
+
+result$val <- -log10(result$Adjusted.P.value)
+result <- result[1:5,]
+result$num <- unlist(lapply(result$Overlap, function(x) unlist(strsplit(x, "/"))[1]))
+
+result <- result %>%
+  arrange(val) %>%    # First sort by val. This sort the dataframe but NOT the factor levels
+  mutate(Term=factor(Term, levels=Term))  # This trick update the factor levels
+p2 <-  ggplot(result, aes(x=Term, y=val))+
+    geom_segment( aes(xend=Term, yend=0)) +
+    geom_point(size=point_size, color=col) +
+    geom_text(aes(label = num), size=3, vjust = 0,hjust= 0.5) +
+    coord_flip() +
+    theme_bw() +
+    ylab("-log10(FDR pValue)")+
+    xlab("KEGG Pathways")
+
+enriched <- enrichr(gene_list, TFs)
+result <- enriched[[1]]
+result <- result %>% filter(Adjusted.P.value<thr&grepl("human",Term))
+
+result$val <- -log10(result$Adjusted.P.value)
+result <- result[1:5,]
+result$Term <- gsub("human","",result$Term)
+result$num <- unlist(lapply(result$Overlap, function(x) unlist(strsplit(x, "/"))[1]))
+
+result <- result %>%
+  arrange(val) %>%    # First sort by val. This sort the dataframe but NOT the factor levels
+  mutate(Term=factor(Term, levels=Term))    # This trick update the factor levels
+p3 <- ggplot(result, aes(x=Term, y=val))+
+    geom_segment( aes(xend=Term, yend=0)) +
+    geom_point(size=point_size, color=col) +
+    geom_text(aes(label = num), size=3, vjust = 0,hjust= 0.5) +
+    coord_flip() +
+    theme_bw() +
+    ylab("-log10(FDR pValue)")+
+    xlab("TRRUST")
+
+gene_list = as.vector(overlapping_proteins)
+col <- "#fe938b"
+dbs <- listEnrichrDbs()
+head(dbs)
+BPs <- c("GO_Biological_Process_2021")
+pathways <- c("KEGG_2021_Human")
+databases <- c("DisGeNET")
+TFs <- c("TRRUST_Transcription_Factors_2019")
+species <- "Homo sapiens"
+
+enriched <- enrichr(gene_list, BPs)
+result <- enriched[[1]]
+result <- result %>% filter(Adjusted.P.value<thr)
+
+result$val <- -log10(result$Adjusted.P.value)
+result <- result[1:12,]
+result$Term <- unlist(lapply(result$Term, function(x) sub("\\s*\\(.*", "", x)))
+result$num <- unlist(lapply(result$Overlap, function(x) unlist(strsplit(x, "/"))[1]))
+
+result <- result %>%
+  arrange(val) %>%    # First sort by val. This sort the dataframe but NOT the factor levels
+  mutate(Term=factor(Term, levels=Term))   # This trick update the factor levels
+p4 = ggplot(result, aes(x=Term, y=val))+
+    geom_segment( aes(xend=Term, yend=0)) +
+    geom_point(size=point_size, color=col) +
+    geom_text(aes(label = num), size=3, vjust = 0,hjust= 0.5) +
+    coord_flip() +
+    theme_bw() +
+    ylab("-log10(FDR pValue)")+
+    xlab("")
+
+enriched <- enrichr(gene_list, pathways)
+result <- enriched[[1]]
+result <- result %>% filter(Adjusted.P.value<thr)
+
+result$val <- -log10(result$Adjusted.P.value)
+result <- result[1:4,]
+result$num <- unlist(lapply(result$Overlap, function(x) unlist(strsplit(x, "/"))[1]))
+
+result <- result %>%
+  arrange(val) %>%    # First sort by val. This sort the dataframe but NOT the factor levels
+  mutate(Term=factor(Term, levels=Term))  # This trick update the factor levels
+p5 <-  ggplot(result, aes(x=Term, y=val))+
+    geom_segment( aes(xend=Term, yend=0)) +
+    geom_point(size=point_size, color=col) +
+    geom_text(aes(label = num), size=3, vjust = 0,hjust= 0.5) +
+    coord_flip() +
+    theme_bw() +
+    ylab("-log10(FDR pValue)")+
+    xlab("")
+
+enriched <- enrichr(gene_list, TFs)
+result <- enriched[[1]]
+result <- result %>% filter(Adjusted.P.value<thr&grepl("human",Term))
+
+result$val <- -log10(result$Adjusted.P.value)
+result <- result[1:5,]
+result$Term <- gsub("human","",result$Term)
+result$num <- unlist(lapply(result$Overlap, function(x) unlist(strsplit(x, "/"))[1]))
+
+result <- result %>%
+  arrange(val) %>%    # First sort by val. This sort the dataframe but NOT the factor levels
+  mutate(Term=factor(Term, levels=Term))    # This trick update the factor levels
+p6 <- ggplot(result, aes(x=Term, y=val))+
+    geom_segment( aes(xend=Term, yend=0)) +
+    geom_point(size=point_size, color=col) +
+    geom_text(aes(label = num), size=3, vjust = 0,hjust= 0.5) +
+    coord_flip() +
+    theme_bw() +
+    ylab("-log10(FDR pValue)")+
+    xlab("")
+
+gene_list = as.vector(onlyDiscovery_proteins)
+col <- "steelblue"
+dbs <- listEnrichrDbs()
+head(dbs)
+BPs <- c("GO_Biological_Process_2021")
+pathways <- c("KEGG_2021_Human")
+databases <- c("DisGeNET")
+TFs <- c("TRRUST_Transcription_Factors_2019")
+species <- "Homo sapiens"
+
+enriched <- enrichr(gene_list, BPs)
+result <- enriched[[1]]
+result <- result %>% filter(Adjusted.P.value<thr)
+
+result$val <- -log10(result$Adjusted.P.value)
+result <- result[1:12,]
+result$Term <- unlist(lapply(result$Term, function(x) sub("\\s*\\(.*", "", x)))
+result$num <- unlist(lapply(result$Overlap, function(x) unlist(strsplit(x, "/"))[1]))
+
+result <- result %>%
+  arrange(val) %>%    # First sort by val. This sort the dataframe but NOT the factor levels
+  mutate(Term=factor(Term, levels=Term))   # This trick update the factor levels
+p7 = ggplot(result, aes(x=Term, y=val))+
+    geom_segment( aes(xend=Term, yend=0)) +
+    geom_point(size=point_size, color=col) +
+    geom_text(aes(label = num), size=3, vjust = 0,hjust= 0.5) +
+    coord_flip() +
+    theme_bw() +
+    ylab("-log10(FDR pValue)")+
+    xlab("")
+
+enriched <- enrichr(gene_list, pathways)
+result <- enriched[[1]]
+result <- result %>% filter(Adjusted.P.value<thr)
+
+result$val <- -log10(result$Adjusted.P.value)
+result <- result[1:5,]
+result$num <- unlist(lapply(result$Overlap, function(x) unlist(strsplit(x, "/"))[1]))
+
+result <- result %>%
+  arrange(val) %>%    # First sort by val. This sort the dataframe but NOT the factor levels
+  mutate(Term=factor(Term, levels=Term))  # This trick update the factor levels
+p8 <-  ggplot(result, aes(x=Term, y=val))+
+    geom_segment( aes(xend=Term, yend=0)) +
+    geom_point(size=point_size, color=col) +
+    geom_text(aes(label = num), size=3, vjust = 0,hjust= 0.5) +
+    coord_flip() +
+    theme_bw() +
+    ylab("-log10(FDR pValue)")+
+    xlab("")
+
+enriched <- enrichr(gene_list, TFs)
+result <- enriched[[1]]
+result <- result %>% filter(Adjusted.P.value<thr&grepl("human",Term))
+
+result$val <- -log10(result$Adjusted.P.value)
+result <- result[1:5,]
+result$Term <- gsub("human","",result$Term)
+result$num <- unlist(lapply(result$Overlap, function(x) unlist(strsplit(x, "/"))[1]))
+
+result <- result %>%
+  arrange(val) %>%    # First sort by val. This sort the dataframe but NOT the factor levels
+  mutate(Term=factor(Term, levels=Term))    # This trick update the factor levels
+p9 <- ggplot(result, aes(x=Term, y=val))+
+    geom_segment( aes(xend=Term, yend=0)) +
+    geom_point(size=point_size, color=col) +
+    geom_text(aes(label = num), size=3, vjust = 0,hjust= 0.5) +
+    coord_flip() +
+    theme_bw() +
+    ylab("-log10(FDR pValue)")+
+    xlab("")
+
+pdf("New Figures/FunctionalEnrichment.pdf",width=20,height = 6)
+plot_grid(p1,p4,p7,p2,p5,p8,p3,p6,p9,nrow=3,ncol=3,align="hv",rel_heights = c(1,0.5,0.5),rel_widths = c(1,1,1))
+dev.off()
+```
+
